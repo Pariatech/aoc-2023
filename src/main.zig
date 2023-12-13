@@ -40,8 +40,6 @@ pub fn main() !void {
         \\  +z INTEGER NOT NULL,
         \\  +floor INTEGER NOT NULL,
         \\);
-        \\
-        \\DELETE FROM tiles;
     ;
 
     if (c.sqlite3_exec(db, create_tiles_table_sql, null, null, &err_msg) != c.SQLITE_OK) {
@@ -53,52 +51,57 @@ pub fn main() !void {
     const insert_tile_sql =
         \\ INSERT INTO tiles (min_x, max_x, min_z, max_z, x, z, floor) VALUES (?, ?, ?, ?,  ?, ?, ?);
     ;
+    _ = insert_tile_sql;
 
-    for (0..1000) |x| {
-        for (0..1000) |z| {
-            var stmt: ?*c.sqlite3_stmt = undefined;
-            if (c.sqlite3_prepare(db, insert_tile_sql, -1, &stmt, 0) != c.SQLITE_OK) {
-                std.debug.print("SQL Error: {s}\n", .{c.sqlite3_errmsg(db)});
-                return error.SqlError;
-            }
-            const tile = Tile{
-                .x = @intCast(x),
-                .z = @intCast(z),
-                .floor = 0,
-            };
-            const fx: f64 = @floatFromInt(tile.x);
-            const fz: f64 = @floatFromInt(tile.z);
-            _ = c.sqlite3_bind_double(stmt, 1, fx - 0.5);
-            _ = c.sqlite3_bind_double(stmt, 2, fx + 0.5);
-            _ = c.sqlite3_bind_double(stmt, 3, fz - 0.5);
-            _ = c.sqlite3_bind_double(stmt, 4, fz + 0.5);
-            _ = c.sqlite3_bind_int(stmt, 5, tile.x);
-            _ = c.sqlite3_bind_int(stmt, 6, tile.z);
-            _ = c.sqlite3_bind_int(stmt, 7, tile.floor);
-
-            if (c.sqlite3_step(stmt) != c.SQLITE_DONE) {
-                std.debug.print("SQL Error: {s}\n", .{c.sqlite3_errmsg(db)});
-                return error.SqlError;
-            }
-
-            _ = c.sqlite3_finalize(stmt);
-        }
-    }
+    // for (0..1000) |x| {
+    //     for (0..1000) |z| {
+    //         var stmt: ?*c.sqlite3_stmt = undefined;
+    //         if (c.sqlite3_prepare(db, insert_tile_sql, -1, &stmt, 0) != c.SQLITE_OK) {
+    //             std.debug.print("SQL Error: {s}\n", .{c.sqlite3_errmsg(db)});
+    //             return error.SqlError;
+    //         }
+    //         const tile = Tile{
+    //             .x = @intCast(x),
+    //             .z = @intCast(z),
+    //             .floor = 0,
+    //         };
+    //         const fx: f64 = @floatFromInt(tile.x);
+    //         const fz: f64 = @floatFromInt(tile.z);
+    //         _ = c.sqlite3_bind_double(stmt, 1, fx - 0.5);
+    //         _ = c.sqlite3_bind_double(stmt, 2, fx + 0.5);
+    //         _ = c.sqlite3_bind_double(stmt, 3, fz - 0.5);
+    //         _ = c.sqlite3_bind_double(stmt, 4, fz + 0.5);
+    //         _ = c.sqlite3_bind_int(stmt, 5, tile.x);
+    //         _ = c.sqlite3_bind_int(stmt, 6, tile.z);
+    //         _ = c.sqlite3_bind_int(stmt, 7, tile.floor);
+    //
+    //         if (c.sqlite3_step(stmt) != c.SQLITE_DONE) {
+    //             std.debug.print("SQL Error: {s}\n", .{c.sqlite3_errmsg(db)});
+    //             return error.SqlError;
+    //         }
+    //
+    //         _ = c.sqlite3_finalize(stmt);
+    //     }
+    // }
 
     const start = std.time.microTimestamp();
     var read_tile: Tile = undefined;
     const select_tiles_sql =
         \\ SELECT x, z, floor FROM tiles 
-        \\ WHERE  (min_x >= 1.0 AND min_x <= 5.0 and min_z >= 1.0 AND min_z <= 5.0)
-        \\ OR     (max_x >= 1.0 AND max_x <= 5.0 and max_z >= 1.0 AND max_z <= 5.0)
-        \\ OR     (min_x >= 1.0 AND min_x <= 5.0 and max_z >= 1.0 AND max_z <= 5.0)
-        \\ OR     (max_x >= 1.0 AND max_x <= 5.0 and min_z >= 1.0 AND min_z <= 5.0)
+        \\ WHERE  (min_x >= ?1 AND min_x <= ?2 and min_z >= ?1 AND min_z <= ?2)
+        \\ OR     (max_x >= ?1 AND max_x <= ?2 and max_z >= ?1 AND max_z <= ?2)
+        \\ OR     (min_x >= ?1 AND min_x <= ?2 and max_z >= ?1 AND max_z <= ?2)
+        \\ OR     (max_x >= ?1 AND max_x <= ?2 and min_z >= ?1 AND min_z <= ?2)
+        \\ ORDER BY z DESC, x DESC;
     ;
     var stmt: ?*c.sqlite3_stmt = undefined;
     if (c.sqlite3_prepare_v2(db, select_tiles_sql, -1, &stmt, 0) != c.SQLITE_OK) {
         std.debug.print("SQL Error: {s}\n", .{c.sqlite3_errmsg(db)});
         return error.SqlError;
     }
+
+    _ = c.sqlite3_bind_double(stmt, 1, 0.0);
+    _ = c.sqlite3_bind_double(stmt, 2, 10.0);
 
     var tiles = std.ArrayList(Tile).init(allocator);
     var rc: i32 = 0;
